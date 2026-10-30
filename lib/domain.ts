@@ -1,0 +1,16 @@
+import { z } from 'zod';
+export const schemeSchema = z.object({id:z.string().min(1).max(80),name:z.string().min(2).max(100),amount:z.number().int().min(100).max(100000000),monthly:z.number().int().min(1).max(10000000),months:z.number().int().min(1).max(120),startDate:z.iso.date(),slots:z.number().int().min(0).max(10000),benefits:z.array(z.string().min(2).max(140)).min(1).max(5),published:z.boolean()});
+export const customerSchema = z.object({id:z.string().min(1).max(80),name:z.string().min(2).max(100),phone:z.string().regex(/^\+?[1-9]\d{9,14}$/),address:z.string().min(3).max(400),city:z.string().min(2).max(100),dob:z.iso.date(),schemeId:z.string().min(1),status:z.enum(['live','closed']),dueDate:z.iso.date(),months:z.number().int().min(1).max(120),consent:z.boolean(),paidPeriods:z.array(z.string().regex(/^\d{4}-\d{2}$/)).max(120)}).refine(c=>c.dob<=indiaToday(),'Date of birth cannot be in the future');
+export const settingsSchema=z.object({birthdayTemplate:z.string().min(10).max(1000),address:z.string().max(300),phone:z.string().regex(/^\+?[1-9]\d{9,14}$/)});
+export type Scheme=z.infer<typeof schemeSchema>;
+export type Customer=z.infer<typeof customerSchema>;
+export type Settings=z.infer<typeof settingsSchema>;
+export type Data={schemes:Scheme[];customers:Customer[];settings:Settings};
+export const defaults:Settings={birthdayTemplate:'Happy birthday, {name}! Wishing you a wonderful year filled with happiness, good health and new beginnings. Warm wishes from Sri Krishna Lakshmi Chit Funds.',address:'Pollachi, Tamil Nadu',phone:'9942177315'};
+export const examples:Scheme[]=[{id:'example-1',name:'A little today. More tomorrow.',amount:100000,monthly:5000,months:20,startDate:'2026-12-01',slots:8,benefits:['Build a regular savings habit','Manageable monthly contributions','Digital payments accepted'],published:false},{id:'example-2',name:'Make room for bigger dreams.',amount:300000,monthly:10000,months:30,startDate:'2026-12-15',slots:12,benefits:['Plan for your next milestone','Clear contribution schedule','Personal support at every step'],published:false},{id:'example-3',name:'Your next chapter starts here.',amount:500000,monthly:12500,months:40,startDate:'2027-01-01',slots:6,benefits:['Save towards a larger goal','Stay on track every month','Digital payments accepted'],published:false}];
+export function indiaToday(now=new Date()){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);}
+export function dateLabel(date:string){return new Date(date+'T12:00:00').toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});}
+export function money(n:number){return '₹'+n.toLocaleString('en-IN');}
+export function paymentDue(c:Customer,date:string){if(c.status!=='live'||date<c.dueDate)return false;const [y,m,d]=date.split('-').map(Number);const [sy,sm,sd]=c.dueDate.split('-').map(Number);const elapsed=(y-sy)*12+m-sm;return elapsed>=0&&elapsed<c.months&&d===Math.min(sd,new Date(y,m,0).getDate())&&!c.paidPeriods.includes(date.slice(0,7));}
+export function birthday(c:Customer,date:string){return c.dob.slice(5)===date.slice(5);}
+export function whatsapp(phone:string,message:string){const clean=phone.replace(/\D/g,'');return `https://wa.me/${clean.length===10?'91'+clean:clean}?text=${encodeURIComponent(message)}`;}
