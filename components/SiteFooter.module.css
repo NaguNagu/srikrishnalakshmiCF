@@ -1,0 +1,26 @@
+.footer{background:#edf2f7;border-top:1px solid var(--line);margin-top:32px}
+.invitation{display:flex;align-items:center;justify-content:space-between;gap:40px;padding:52px 0 42px;border-bottom:1px solid #cdd9e4}
+.kicker{display:block;color:var(--copper);font-size:10px;font-weight:600;letter-spacing:1.4px;margin-bottom:16px}
+.invitation h2{font-size:36px;line-height:1.25;letter-spacing:-1px;margin-bottom:15px}
+.invitation p{font-size:14px;max-width:530px;margin-bottom:0;line-height:1.8}
+.columns{display:grid;grid-template-columns:1.5fr .8fr 1fr;gap:70px;padding:44px 0 32px}
+.columns>div,.navigation{min-width:0}
+.identity>p{font-size:13px;line-height:1.85;max-width:345px;margin:22px 0 19px}
+.reach{display:flex;align-items:center;gap:9px;font-size:12px}
+.columns h3{font-family:var(--font);font-size:13px;font-weight:600;margin:0 0 17px;letter-spacing:0}
+.navigation{display:flex;flex-direction:column;align-items:flex-start}
+.navigation a{font-size:13px;min-height:34px;display:flex;align-items:center}
+.contact a{display:flex;align-items:center;gap:9px;width:fit-content;min-height:36px}
+.phone{font-size:18px;font-weight:500;letter-spacing:-.2px}
+.chat{font-size:13px}
+.contact p{font-size:12px;line-height:1.85;margin:17px 0 0}
+.contact .payments{margin-top:12px}
+.note{border-top:1px solid #cdd9e4;padding:22px 0;display:grid;grid-template-columns:135px 1fr;gap:24px;font-size:11px;line-height:1.85}
+.note strong{font-weight:600}
+.note p{font-size:11px;max-width:770px;margin:0}
+.bottom{border-top:1px solid #cdd9e4;display:flex;align-items:center;justify-content:space-between;gap:25px;padding:18px 0 24px;font-size:11px;color:var(--muted)}
+.bottom a{display:flex;align-items:center;gap:7px;min-height:36px;color:var(--ink);white-space:nowrap}
+.footer a:hover{text-decoration:underline;text-underline-offset:4px}
+@media(max-width:1000px){.columns{gap:32px;grid-template-columns:1.2fr .8fr 1fr}.identity :global(.brand){gap:8px}.identity :global(.brand)>span{font-size:15px}.identity :global(.brand) img{width:48px}.phone{font-size:16px}}
+@media(max-width:700px){.invitation{align-items:flex-start;flex-direction:column;gap:23px;padding:35px 0}.invitation h2{font-size:32px}.columns{grid-template-columns:1fr 1fr;gap:30px;padding-top:32px}.identity{grid-column:1/-1}.identity>p{max-width:480px;margin:18px 0 13px}.identity :global(.brand)>span{font-size:18px}.identity :global(.brand) img{width:60px}.note{grid-template-columns:1fr;gap:6px}.bottom{align-items:flex-start;padding-bottom:80px}.bottom>span{max-width:290px}.navigation a{min-height:40px}.contact a{min-height:40px}}
+@media(max-width:380px){.columns{grid-template-columns:1fr}.identity{grid-column:auto}.invitation h2{font-size:29px}.bottom{flex-direction:column;gap:8px}.kicker{font-size:9px}}
