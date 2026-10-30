@@ -15,23 +15,34 @@ Open `http://localhost:3000`. The owner workspace is at `/admin`.
 
 The public Savings schemes page always shows the 15 owner-supplied standard plans. Their base monthly contributions are calculated as value ÷ duration and labelled accordingly. Only administrator-published records starting in the next calendar month appear in Upcoming savings schemes. Without a database connection, that section shows a clear empty state. Without the required environment variables, owner sign-in is disabled. A separate demo workspace uses **sample records in sessionStorage in the current browser tab**. Never enter real customer information in demo mode. Demo edits do not affect the public website or a database.
 
-## Enable the real owner workspace
+## Firebase administrator authentication
 
-1. Create a MongoDB Atlas database (or use an existing MongoDB deployment). Create a dedicated database user with read/write access to this application's database. Allow connections from the hosting environment.
-2. Copy `.env.example` to `.env.local` for local development. Set `MONGODB_URI`, `MONGODB_DB`, `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, and `SESSION_SECRET`.
-3. Generate the password hash with `node scripts/hash-password.mjs 'a-long-unique-password'`. Use at least 12 characters. The result is a salted scrypt hash. Keep the password private.
-4. Generate a session secret with `openssl rand -base64 48`. Use at least 32 characters. Never commit secrets.
-5. Restart the development server or redeploy. Sign in with the configured email and password. No public administrator registration exists.
-6. Add the complete office address and birthday template in Settings. The supplied location is Pollachi, Tamil Nadu; no street address has been invented.
-7. Create and publish upcoming schemes with their actual start dates and slots. These appear only in the Upcoming section for the next calendar month in India Standard Time. The 15 standard catalogue plans have no invented start dates or slot counts. Customer records require an existing administrator-created scheme.
+Administrator sign-in uses Firebase Authentication with email/password. The sole authorised email is **sklcf66@gmail.com**. The initial password is never stored in source, environment examples, tests or Git history. Customer and scheme storage remains in MongoDB; this change does not migrate business data.
 
-Database indexes are created on first use, including unique record IDs and a TTL index for login rate-limit records. The database user needs index creation permission. Owner sessions use signed JWTs in HttpOnly, SameSite=Strict cookies, secure on production. All customer-data endpoints check the session; mutations check the request origin and validate data with Zod. Login attempts are rate limited in MongoDB. Customer records never appear in the public schemes endpoint. Database outages produce an error, rather than falling back to demo records.
+1. Select the intended Firebase project before configuring cloud resources. Use a dedicated project or explicitly confirm an existing one; do not change an unrelated project's providers.
+2. Enable **Email/Password** under Firebase Authentication. For a new dedicated project, `firebase.json` contains the provider configuration; deploy it with `npx -y firebase-tools@latest deploy --only auth --project <PROJECT_ID>`. Do not deploy other Firebase services for this task.
+3. Register a Firebase **Web app**. Its public configuration can be retrieved using `npx -y firebase-tools@latest apps:sdkconfig WEB <APP_ID> --project <PROJECT_ID>`. Populate the four `NEXT_PUBLIC_FIREBASE_*` variables from `.env.example`.
+4. Configure server-only Firebase Admin SDK credentials in `.env.local` and Vercel: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY`. These credentials must belong to the same project as the Web app. Never prefix them with `NEXT_PUBLIC_`, commit a service-account JSON file, or paste private keys into chat.
+5. Provision the requested administrator with `node scripts/provision-firebase-admin.mjs`. The script reads the initial password from a hidden terminal prompt. It creates only the named administrator, and leaves an existing account's password unchanged. Copy its resulting UID into server-only `FIREBASE_ADMIN_UID`. There is no public account-creation flow.
+6. In Firebase Authentication settings, add `sklcf.vercel.app` and any actual preview/local domains you use to authorised domains. Configure the reset-email template and set the Firebase project password policy to a minimum of 12 characters. Do not change the supplied email account's Google password; the administrator password belongs to the Firebase account only.
+7. Populate `MONGODB_URI` and `MONGODB_DB` for business records. Firebase sign-in and password management do not require MongoDB, but customer/scheme records and business settings do.
+8. Redeploy Vercel after adding the public configuration: Next.js embeds these values at build time. Private Firebase keys remain server-side.
+
+The server exchanges a recently signed-in Firebase ID token for an eight-hour Firebase session cookie. It verifies both the exact pinned UID and administrator email, not just an email match. The cookie is HttpOnly, SameSite=Strict and Secure in production. Every private customer API verifies the Firebase session with revocation checks. Unknown accounts, missing UID configuration, invalid tokens, stale sign-ins and old custom-JWT cookies are rejected. Mutations also check the request origin.
+
+**Forgot password:** the sign-in screen requests a Firebase reset email. The user completes the reset on Firebase's hosted page. The screen uses a neutral confirmation and never claims the password was changed merely because an email was requested. Only the administrator address is eligible through this UI.
+
+**Change password:** Settings includes a separate form for the current password, new password and confirmation. Firebase verifies the current password again, then the server checks the current session, administrator identity and recent sign-in before updating the Firebase password. Successful changes clear the session and require a new sign-in. Previous Firebase sessions are revoked. Demo mode cannot change credentials or send reset emails.
+
+The old `ADMIN_PASSWORD_HASH`, `ADMIN_EMAIL` and `SESSION_SECRET` authentication variables and password-hashing helper are no longer used. Remove obsolete variables from Vercel after the Firebase configuration is working. Existing legacy cookies stop granting access.
+
+Database indexes are created on first use, including unique record IDs. The database user needs index creation permission. Customer records never appear in the public schemes endpoint. Database outages produce an error rather than falling back to demo records; the administrator can still reach password settings after sign-in.
 
 ## Deploy on Vercel
 
 1. Push this source to `https://github.com/NaguNagu/srikrishnalakshmiCF.git`.
 2. Import that repository into Vercel. Use the automatic Next.js preset and default root directory. Build command: `npm run build`.
-3. Add the five environment variables from `.env.example` in Vercel Project Settings for the required environments. Redeploy after changing environment variables.
+3. Add the environment variables from `.env.example` in Vercel Project Settings for the required environments. Redeploy after changing environment variables.
 4. Verify owner sign-in, create a draft scheme, add a test customer, publish the approved scheme and confirm it appears on the homepage. Test with disposable records before entering real data. Enable database backups through your database provider.
 
 Production uses the existing Vercel project at https://sklcf.vercel.app. Its Framework Preset must remain Next.js, the root directory must be the repository root, and the Output Directory override must stay off. No Sites hosting or additional paid infrastructure has been created. The user's requested GitHub/Vercel workflow takes precedence over Sites hosting defaults.
@@ -51,7 +62,7 @@ Each plan’s Enquire action opens an accessible dialog showing its value, durat
 - Owner: customer create/edit/search/status filter; name, phone, address, city, DOB, chosen scheme, live/closed status, first due date and duration; WhatsApp consent.
 - Schemes: editable value, monthly contribution, benefits, start date, open slots, duration and draft/published state. Save generates the information needed for a fixed-template poster; preview/download is generated from current details on demand without a paid image service. Slots are maintained manually.
 - Reminders: in-app birthdays and unpaid contributions for the current India date. Calendar dates show that day's events for advance planning. Contributions repeat monthly from the first due date for the selected number of months; shorter months use their last day. Mark paid records the year/month. Closed schemes suppress payment reminders. Birthdays remain visible for all customer records. Leap-day birthdays occur on February 29 only.
-- Settings: editable birthday message with `{name}`, business telephone and poster address. “B” opens the personalised birthday message for the customer's phone in WhatsApp.
+- Settings: current-password-confirmed Firebase password change, plus editable birthday message with `{name}`, business telephone and poster address. “B” opens the personalised birthday message for the customer's phone in WhatsApp.
 
 ## WhatsApp and notification boundaries
 
@@ -71,7 +82,7 @@ npm test
 npm run build
 ```
 
-Domain tests cover monthly recurrence, month-end and leap-year behavior, payment status, birthdays, India date boundaries, phone encoding and validation. Real MongoDB authentication/storage and native WhatsApp sharing must also be tested with configured credentials and supported devices before launch.
+Domain tests cover monthly recurrence, month-end and leap-year behavior, payment status, birthdays, India date boundaries, phone encoding and validation. The Firebase Auth emulator also verifies real SDK sign-in, session issuance/revocation, password changes and recovery without contacting a cloud project. Run it with `npx -y firebase-tools@latest emulators:exec --only auth --project demo-sklcf-auth "node --import tsx tests/firebase-emulator.mjs"`. The emulator test refuses remote hosts. Real Firebase project configuration, administrator provisioning, reset-email delivery, MongoDB storage and native WhatsApp sharing must also be verified with the intended project before launch.
 
 ## Content and asset notes
 

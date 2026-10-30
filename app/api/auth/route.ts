@@ -1,15 +1,37 @@
-import {NextResponse} from 'next/server';
-import {authenticated,configured,db,issueSession,sameOrigin,verifyPassword} from '@/lib/server';
-export const runtime='nodejs';
-export async function GET(){return NextResponse.json({configured:configured(),authenticated:await authenticated()},{headers:{'Cache-Control':'no-store'}});}
-export async function POST(req:Request){
- if(!sameOrigin(req))return NextResponse.json({error:'Invalid request origin'},{status:403});
- if(!configured())return NextResponse.json({error:'Owner login needs the environment variables listed in the setup guide.'},{status:503});
- try {const body=await req.json();if(typeof body.email!=='string'||typeof body.password!=='string'||body.password.length>256)return NextResponse.json({error:'Invalid credentials'},{status:400});
- const database=await db();const bucket=Math.floor(Date.now()/900000);const attempts=database.collection('loginAttempts');const result=await attempts.findOneAndUpdate({key:'owner',bucket},{$inc:{count:1},$setOnInsert:{expires:new Date(Date.now()+1800000)}},{upsert:true,returnDocument:'after'});
- if((result?.count??0)>15)return NextResponse.json({error:'Too many attempts. Please try again in 15 minutes.'},{status:429});
- const valid=verifyPassword(body.password);if(!valid||body.email.toLowerCase()!==process.env.ADMIN_EMAIL!.toLowerCase())return NextResponse.json({error:'Email or password is incorrect.'},{status:401});
- const res=NextResponse.json({ok:true});res.cookies.set('sklcf-session',await issueSession(),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',maxAge:28800});return res;
- }catch{return NextResponse.json({error:'Login service is unavailable. Please check the database connection.'},{status:503});}
+import { NextResponse } from 'next/server';
+import { authenticated, configured, sameOrigin } from '@/lib/server';
+import { firebaseAdminAuth } from '@/lib/firebase-admin';
+import { hasRecentSignIn, isAdministrator, sessionCookieName, sessionDurationMs, sessionRequestSchema } from '@/lib/auth-policy';
+
+export const runtime = 'nodejs';
+const noStore = { 'Cache-Control': 'no-store' };
+export async function GET() {
+  return NextResponse.json({ configured: configured(), authenticated: await authenticated(), storageConfigured: !!process.env.MONGODB_URI }, { headers: noStore });
 }
-export async function DELETE(req:Request){if(!sameOrigin(req))return NextResponse.json({error:'Invalid origin'},{status:403});const res=NextResponse.json({ok:true});res.cookies.set('sklcf-session','',{maxAge:0,path:'/'});return res;}
+
+export async function POST(req: Request) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+  if (!configured()) return NextResponse.json({ error: 'Firebase administrator sign-in has not been configured yet.' }, { status: 503 });
+  try {
+    const parsed = sessionRequestSchema.safeParse(await req.json());
+    if (!parsed.success) return NextResponse.json({ error: 'A valid Firebase sign-in is required.' }, { status: 400 });
+    const auth = firebaseAdminAuth();
+    const claims = await auth.verifyIdToken(parsed.data.idToken, true);
+    if (!isAdministrator(claims, process.env.FIREBASE_ADMIN_UID)) return NextResponse.json({ error: 'This account is not authorised for the owner workspace.' }, { status: 403 });
+    if (!hasRecentSignIn(claims.auth_time)) return NextResponse.json({ error: 'Please sign in again to continue.' }, { status: 401 });
+    const token = await auth.createSessionCookie(parsed.data.idToken, { expiresIn: sessionDurationMs });
+    const res = NextResponse.json({ ok: true }, { headers: noStore });
+    res.cookies.set(sessionCookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', path: '/', maxAge: sessionDurationMs / 1000 });
+    res.cookies.set('sklcf-session', '', { maxAge: 0, path: '/' });
+    return res;
+  } catch {
+    return NextResponse.json({ error: 'Sign-in could not be verified. Please sign in again.' }, { status: 401 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+  const res = NextResponse.json({ ok: true }, { headers: noStore });
+  for (const name of [sessionCookieName, 'sklcf-session']) res.cookies.set(name, '', { maxAge: 0, path: '/' });
+  return res;
+}
