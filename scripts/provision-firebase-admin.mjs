@@ -1,10 +1,10 @@
 // Run with: node scripts/provision-firebase-admin.mjs
 // Reads the initial password from a hidden prompt, never from arguments or a file.
-import { loadEnvConfig } from '@next/env';
+import nextEnv from '@next/env';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
-loadEnvConfig(process.cwd());
+nextEnv.loadEnvConfig(process.cwd());
 const email = 'sklcf66@gmail.com';
 const projectId = process.env.FIREBASE_PROJECT_ID;
 if (!projectId || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {

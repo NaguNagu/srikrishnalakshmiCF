@@ -5,6 +5,7 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 .firebase/
+.vercel/
 firebase-debug.log*
 *service-account*.json
 *-firebase-adminsdk-*.json
