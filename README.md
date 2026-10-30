@@ -17,6 +17,8 @@ The public Savings schemes page always shows the 15 owner-supplied standard plan
 
 ## Firebase administrator authentication
 
+The dedicated production project is `sklcf-crm-2026`. The server service account has only the Firebase Authentication Admin role. The scoped `jwks-rsa` → `jose` override keeps Firebase Admin compatible with Vercel runtimes that disable CommonJS loading of ES modules; `firebase-runtime.test.ts` checks that restriction explicitly. Track upstream [Firebase Admin issue 3181](https://github.com/firebase/firebase-admin-node/issues/3181) before removing the override.
+
 Administrator sign-in uses Firebase Authentication with email/password. The sole authorised email is **sklcf66@gmail.com**. The initial password is never stored in source, environment examples, tests or Git history. Customer and scheme storage remains in MongoDB; this change does not migrate business data.
 
 1. Select the intended Firebase project before configuring cloud resources. Use a dedicated project or explicitly confirm an existing one; do not change an unrelated project's providers.
