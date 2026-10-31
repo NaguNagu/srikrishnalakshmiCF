@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { catalogue, nextMonthRange, isUpcomingScheme, enquiryMessage, businessPhone } from '../lib/catalogue';
+import { catalogue, mergePlans, initialPlans, resolveFeatured, nextMonthRange, isUpcomingScheme, enquiryMessage, businessPhone } from '../lib/catalogue';
 import { examples, whatsapp } from '../lib/domain';
 
 test('All 15 owner-supplied value/duration combinations remain distinct', () => {
@@ -16,12 +16,9 @@ test('Next calendar month handles year boundaries and leap years', () => {
   assert.deepEqual(nextMonthRange('2028-01-31'), {start:'2028-02-01',end:'2028-03-01'});
 });
 
-test('Upcoming schemes exclude drafts and dates outside the next month', () => {
-  const scheme = {...examples[0], published:true};
-  assert.equal(isUpcomingScheme({...scheme,startDate:'2026-11-01'},'2026-10-30'),true);
-  assert.equal(isUpcomingScheme({...scheme,startDate:'2026-11-30'},'2026-10-30'),true);
-  for (const startDate of ['2026-10-31','2026-12-01','2026-09-01']) assert.equal(isUpcomingScheme({...scheme,startDate},'2026-10-30'),false);
-  assert.equal(isUpcomingScheme({...scheme,startDate:'2026-11-15',published:false},'2026-10-30'),false);
+test('Featured visibility is controlled by publication, not the start month', () => {
+ for(const startDate of ['2020-01-01','2026-10-31','2026-11-01','2028-06-01']) assert.equal(isUpcomingScheme({...examples[0],published:true,startDate}),true);
+ assert.equal(isUpcomingScheme({...examples[0],published:false}),false);
 });
 
 test('Enquiry contains selected plan and every entered contact field', () => {
@@ -37,4 +34,16 @@ test('Upcoming enquiry includes the actual published start and available slots',
   assert.ok(message.includes('Start date: 5 Nov 2026'));
   assert.ok(message.includes('Open slots shown: 7'));
   assert.ok(message.includes('Scheme: A little today. More tomorrow.'));
+});
+
+test('All 15 plans are available and edits/off overrides do not duplicate defaults',()=>{
+ assert.equal(mergePlans([]).length,15);
+ const changed={...initialPlans[0],name:'Edited plan',enabled:false};
+ const custom={...initialPlans[0],id:'custom-plan',amount:80000};
+ const merged=mergePlans([changed,custom]);assert.equal(merged.length,16);
+ assert.equal(merged.find(p=>p.id===changed.id)?.enabled,false);
+ assert.equal(merged.find(p=>p.id===changed.id)?.name,'Edited plan');
+ const linked={...examples[0],published:true,planId:changed.id};
+ assert.equal(resolveFeatured([linked],merged)[0].published,false);
+ assert.equal(resolveFeatured([linked],[{...changed,enabled:true,monthly:4321}])[0].monthly,4321);
 });

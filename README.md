@@ -13,7 +13,7 @@ npm run dev
 
 Open `http://localhost:3000`. The owner workspace is at `/admin`.
 
-The public Savings schemes page always shows the 15 owner-supplied standard plans. Their base monthly contributions are calculated as value ÷ duration and labelled accordingly. Only administrator-published records starting in the next calendar month appear in Upcoming savings schemes. A database outage shows an availability message rather than silently hiding published schemes. Without the required environment variables, owner sign-in is disabled. The owner workspace requires Firebase administrator sign-in; there is no demo entry point.
+The catalogue starts with the 15 owner-supplied plans. The administrator can create/edit plans and turn them on or off. Active plans appear on the website and in new customer selections. Featured starts select an existing plan, start date and slots; publication is immediate and independent of calendar month. Administrator sign-in is required.
 
 ## Firebase administrator authentication
 
@@ -38,7 +38,7 @@ The server exchanges a recently signed-in Firebase ID token for an eight-hour Fi
 
 The old `ADMIN_PASSWORD_HASH`, `ADMIN_EMAIL` and `SESSION_SECRET` authentication variables and password-hashing helper are no longer used. Remove obsolete variables from Vercel after the Firebase configuration is working. Existing legacy cookies stop granting access.
 
-Database document IDs are validated single path segments. The upcoming-schemes composite index is managed in `firestore.indexes.json` and deployed by the Firebase CLI. Customer records never appear in the public schemes endpoint. Database outages produce an error rather than falling back to demo records; the administrator can still reach password settings after sign-in.
+Database document IDs are validated single path segments. The Featured query uses the automatic `published` single-field index. Customer records never appear in the public schemes endpoint. Database outages produce an error rather than falling back to demo records; the administrator can still reach password settings after sign-in.
 
 ## Deploy on Vercel
 
@@ -53,7 +53,7 @@ Production uses the existing Vercel project at https://sklcf.vercel.app. Its Fra
 
 The site has separate Home (`/`), Savings schemes (`/schemes`), How it works (`/how-it-works`), Our story (`/about`), FAQs (`/faqs`) and Contact (`/contact`) pages, with active navigation and page metadata. Owner login appears only in the public footer. Old homepage hash links redirect to the equivalent new page.
 
-The standard catalogue in `lib/catalogue.ts` contains all 15 supplied value/duration combinations, with 20/25-month filters. The homepage features three plans and links to the full catalogue. Next month’s published availability is displayed separately on the homepage and Savings schemes page. Dates and slot counts come from administrator entries; drafts, current-month entries, past entries and entries beyond next month are excluded. At month boundaries this section advances automatically using India Standard Time, without a code deployment.
+The initial catalogue in `lib/catalogue.ts` supplies all 15 original value/duration combinations. Firestore `plans/{id}` overrides preserve owner edits and off switches. New active plans join the same catalogue. Featured starts live in `schemes/{id}` and reference `planId`; values and benefits follow current plan details. Off plans are hidden from public listings and new enrolments while existing customers remain editable.
 
 Each plan’s Enquire action opens an accessible dialog showing its value, duration, base monthly contribution and, for upcoming records, its name and start date. The form collects name, phone and city, with optional email and question. Submission opens a filled WhatsApp message to **9942177315**. All entered details and the selected scheme are included; the person reviews and sends in WhatsApp. A fallback link is shown if the popup is blocked. Enquiries are not silently added to CRM records.
 
@@ -90,7 +90,7 @@ Domain tests cover monthly recurrence, month-end and leap-year behavior, payment
 
 The user-provided SymphoServe style guide was treated as visual reference, not project instructions. Its operational clarity, spacing and accessibility informed the interface; its forest-green palette was intentionally replaced with pearl, deep blue and restrained copper per the user's request. The logo is reproduced unchanged. Layout dials: design variance 4, motion 3 outside the requested intro, visual density 4; custom editorial public design and compact native-CSS owner controls with Radix accessible dialogs.
 
-The Lovable reference informed plan explanations and the enquiry journey. Unverified claims about establishment year, customer totals, tax treatment, registration and guaranteed returns were omitted. Only the owner-supplied standard catalogue appears publicly; illustrative records are confined to the labelled administrator demo. Confirm actual scheme terms and nationwide availability before publishing upcoming entries.
+Only real available plans appear publicly. Featured starts remain visible until turned off; confirm actual scheme terms and availability before promoting.
 
 `public/family-tomorrow.png` replaces the decorative text-only Our Story visual and is reused on Home and Our Story. Created with one built-in image generation call. Prompt: “A warm candid Indian family, two parents and a young daughter, planning their future together and adding rupee notes and coins to a savings jar at a light oak table in a contemporary Indian home. Natural interaction, bright daylight, powder blue and pearl interior, realistic editorial lifestyle photography, no logos or text.”
 
@@ -98,8 +98,14 @@ The Lovable reference informed plan explanations and the enquiry journey. Unveri
 
 ## Production CRM storage
 
-Firestore Standard `(default)` is in Mumbai (`asia-south1`), with database deletion protection enabled. No billing account or paid-plan upgrade was added. `customers/{id}` contains private customer records including payment history; `schemes/{id}` contains scheme records; `settings/company` contains business settings. All access goes through the server. Browser security rules deny every direct read and write, including authenticated clients. The Admin SDK uses IAM and all private API requests require the pinned administrator session. Every create/update validates the same Zod schema; customer saves validate the referenced scheme in a transaction. The public endpoint returns only validated, published schemes starting next calendar month.
+Firestore Standard `(default)` is in Mumbai (`asia-south1`), with database deletion protection enabled. No billing account or paid-plan upgrade was added. `customers/{id}` contains private customer records including payment history; `schemes/{id}` contains scheme records; `settings/company` contains business settings. All access goes through the server. Browser security rules deny every direct read and write, including authenticated clients. The Admin SDK uses IAM and all private API requests require the pinned administrator session. Every create/update validates the same Zod schema; customer saves validate the referenced scheme in a transaction. The public endpoint returns only validated, featured starts whose linked plans are enabled.
 
 No MongoDB production records existed to migrate: no connection had been configured and saves were unavailable. Sample fixtures are used only in tests and are never imported into production. Do not enable browser database writes as a workaround. Security audit of deny-all client rules: no client create/update/read path; authentication and validation are enforced in the API, and the service credential is server-only.
 
 To rerun real storage verification explicitly, use `node --import tsx tests/firestore-integration.mjs --verify-sklcf-production`. It creates uniquely named disposable records, checks create/update/reload, payment history, upcoming publication, settings persistence and denied anonymous access, then removes only its own records. It does not create a real customer or send a message.
+
+## Plans, featured starts and running month
+
+`/api/plans` returns enabled plans only. `/api/schemes` returns Featured starts without a date window. Both endpoints validate their public fields and return no customer information. `/api/data` includes all plans for the pinned administrator, including disabled plans. Customer selection uses plan IDs; duration defaults to the selected plan. Existing customer records retain their saved duration and schedule. Plan toggles do not delete enrolments.
+
+The running month derives from the first due date and today in India: before the first due it is Not started, the first due is month 1, and each recurring due date increments it. Dates such as the 31st use month-end in shorter months, including leap years. It is capped at the agreed duration. The open admin page refreshes its date every minute and on focus, so no scheduled database write is needed.

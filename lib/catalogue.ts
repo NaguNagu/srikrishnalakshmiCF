@@ -1,4 +1,4 @@
-import { indiaToday, money, dateLabel, type Scheme } from './domain';
+import { indiaToday, money, dateLabel, type Scheme, type SavingsPlan } from './domain';
 export const businessPhone = '9942177315';
 export type Plan = { id: string; amount: number; months: number; monthly: number };
 export const catalogue: Plan[] = [
@@ -26,7 +26,20 @@ export function nextMonthRange(today = indiaToday()) {
   const [year, month] = today.split('-').map(Number);
   return { start: new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10), end: new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10) };
 }
-export function isUpcomingScheme(scheme: Scheme, today = indiaToday()) {
-  const { start, end } = nextMonthRange(today);
-  return scheme.published && scheme.startDate >= start && scheme.startDate < end;
+export function isUpcomingScheme(scheme: Scheme, _today = indiaToday()) {
+  return scheme.published;
+}
+export const initialPlans: SavingsPlan[] = catalogue.map(p=>({...p,name:`${money(p.amount)} · ${p.months} months`,enabled:true,benefits:['Regular monthly contributions','Digital payments accepted','Personal support throughout your savings journey']}));
+export function mergePlans(overrides: SavingsPlan[]) {
+ const plans=new Map(initialPlans.map(p=>[p.id,p]));
+ for(const p of overrides)plans.set(p.id,p);
+ return [...plans.values()].sort((a,b)=>a.amount-b.amount||a.months-b.months||a.id.localeCompare(b.id));
+}
+export function resolveFeatured(schemes:Scheme[],plans:SavingsPlan[]) {
+ return schemes.flatMap(s=>{
+  if(!s.planId)return [s]; // Preserve records made before the plan catalogue existed.
+  const plan=plans.find(p=>p.id===s.planId);
+  if(!plan)return [];
+  return [{...s,name:plan.name,amount:plan.amount,monthly:plan.monthly,months:plan.months,benefits:plan.benefits,published:s.published&&plan.enabled}];
+ });
 }
