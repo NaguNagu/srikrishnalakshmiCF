@@ -1,6 +1,23 @@
-import {NextResponse} from 'next/server';
-import {authenticated,db,sameOrigin} from '@/lib/server';
-import {customerSchema,schemeSchema,settingsSchema,defaults} from '@/lib/domain';
-export const runtime='nodejs';
-export async function GET(){if(!await authenticated())return NextResponse.json({error:'Please sign in.'},{status:401});try{const database=await db();const [schemes,customers,settings]=await Promise.all([database.collection('schemes').find({},{projection:{_id:0}}).limit(1000).toArray(),database.collection('customers').find({},{projection:{_id:0}}).limit(10000).toArray(),database.collection('settings').findOne({key:'company'},{projection:{_id:0,key:0}})]);return NextResponse.json({schemes,customers,settings:settings||defaults},{headers:{'Cache-Control':'no-store'}});}catch{return NextResponse.json({error:'Unable to load records. Please retry.'},{status:503});}}
-export async function PUT(req:Request){if(!sameOrigin(req)||!await authenticated())return NextResponse.json({error:'Please sign in again.'},{status:401});try{const body=await req.json();const database=await db();if(body.type==='settings'){const value=settingsSchema.parse(body.value);await database.collection('settings').updateOne({key:'company'},{$set:value},{upsert:true});}else if(body.type==='scheme'){const value=schemeSchema.parse(body.value);await database.collection('schemes').updateOne({id:value.id},{$set:value},{upsert:true});}else if(body.type==='customer'){const value=customerSchema.parse(body.value);if(!await database.collection('schemes').findOne({id:value.schemeId}))return NextResponse.json({error:'Choose an existing scheme.'},{status:400});await database.collection('customers').updateOne({id:value.id},{$set:value},{upsert:true});}else return NextResponse.json({error:'Unknown record type'},{status:400});return NextResponse.json({ok:true});}catch(error){if(error instanceof Error&&error.name==='ZodError')return NextResponse.json({error:'Please check all fields and dates.'},{status:400});return NextResponse.json({error:'Changes could not be saved. Please retry.'},{status:503});}}
+import { NextResponse } from 'next/server';
+import { ZodError } from 'zod';
+import { authenticated, db, sameOrigin } from '@/lib/server';
+import { MissingSchemeError, readRecords, writeRecord } from '@/lib/records';
+export const runtime = 'nodejs';
+const noStore = { 'Cache-Control': 'no-store' };
+export async function GET() {
+  if (!await authenticated()) return NextResponse.json({ error: 'Please sign in.' }, { status: 401, headers: noStore });
+  try { return NextResponse.json(await readRecords(db()), { headers: noStore }); }
+  catch { return NextResponse.json({ error: 'Unable to load records. Please retry.' }, { status: 503, headers: noStore }); }
+}
+export async function PUT(req: Request) {
+  if (!sameOrigin(req)) return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+  if (!await authenticated()) return NextResponse.json({ error: 'Please sign in again.' }, { status: 401 });
+  try {
+    await writeRecord(db(), await req.json());
+    return NextResponse.json({ ok: true }, { headers: noStore });
+  } catch (error) {
+    if (error instanceof ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Please check all fields and dates.' }, { status: 400 });
+    if (error instanceof MissingSchemeError) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: 'Changes could not be saved. Please retry.' }, { status: 503 });
+  }
+}

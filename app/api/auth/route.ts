@@ -6,7 +6,7 @@ import { hasRecentSignIn, isAdministrator, sessionCookieName, sessionDurationMs,
 export const runtime = 'nodejs';
 const noStore = { 'Cache-Control': 'no-store' };
 export async function GET() {
-  return NextResponse.json({ configured: configured(), authenticated: await authenticated(), storageConfigured: !!process.env.MONGODB_URI }, { headers: noStore });
+  return NextResponse.json({ configured: configured(), authenticated: await authenticated(), storageConfigured: configured() }, { headers: noStore });
 }
 
 export async function POST(req: Request) {

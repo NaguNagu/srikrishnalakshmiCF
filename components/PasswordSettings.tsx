@@ -5,10 +5,10 @@ import { LockKey } from '@phosphor-icons/react';
 import { administratorEmail, passwordChangeSchema } from '@/lib/auth-policy';
 import { firebaseClientAuth, firebaseErrorMessage } from '@/lib/firebase-client';
 
-export default function PasswordSettings({ demo, onChanged }: { demo: boolean; onChanged: () => void }) {
+export default function PasswordSettings({ onChanged }: { onChanged: () => void }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   async function change(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (demo) return; setError('');
+    event.preventDefault(); setError('');
     const f = new FormData(event.currentTarget), currentPassword = String(f.get('currentPassword')), newPassword = String(f.get('newPassword'));
     if (newPassword !== f.get('confirmPassword')) { setError('The new passwords do not match.'); return; }
     if (newPassword === currentPassword) { setError('Choose a new password that is different from your current password.'); return; }
@@ -26,10 +26,9 @@ export default function PasswordSettings({ demo, onChanged }: { demo: boolean; o
     finally { if (clientAuth) await signOut(clientAuth).catch(() => undefined); setBusy(false); }
   }
   return <section className="panel settings-form password-settings"><h2>Keep your account yours.</h2><p>Change the password for {administratorEmail}. Confirm your current password first. After a successful change, sign in again with your new password.</p>
-    {demo && <p className="notice">Password changes are available only in the real administrator account. Demo mode cannot change any credentials.</p>}
     {error && <p className="error" role="alert">{error}</p>}
-    <form onSubmit={change}><fieldset disabled={demo || busy}><label>Current password<input name="currentPassword" type="password" required maxLength={128} autoComplete="current-password" /></label>
+    <form onSubmit={change}><fieldset disabled={busy}><label>Current password<input name="currentPassword" type="password" required maxLength={128} autoComplete="current-password" /></label>
       <div className="form-grid"><label>New password<input name="newPassword" type="password" required minLength={12} maxLength={128} autoComplete="new-password" /></label><label>Confirm new password<input name="confirmPassword" type="password" required minLength={12} maxLength={128} autoComplete="new-password" /></label></div>
-      <small>Use at least 12 characters. Your password is managed by Firebase Authentication.</small><button className="button primary" disabled={demo || busy}>{busy ? 'Changing password…' : 'Change password'} <LockKey size={18} /></button></fieldset></form>
+      <small>Use at least 12 characters. Your password is managed by Firebase Authentication.</small><button className="button primary" disabled={busy}>{busy ? 'Changing password…' : 'Change password'} <LockKey size={18} /></button></fieldset></form>
   </section>;
 }

@@ -5,8 +5,18 @@
     }
   },
   "emulators": {
-    "auth": { "port": 9099 },
-    "ui": { "enabled": false },
+    "auth": {
+      "port": 9099
+    },
+    "ui": {
+      "enabled": false
+    },
     "singleProjectMode": true
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json",
+    "database": "(default)",
+    "location": "asia-south1"
   }
 }

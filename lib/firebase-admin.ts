@@ -9,7 +9,7 @@ export function firebaseServerConfigured() {
     process.env.FIREBASE_PROJECT_ID === process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
 }
 
-export function firebaseAdminAuth() {
+export function firebaseAdminApp() {
   if (!firebaseServerConfigured()) throw new Error('Firebase administrator authentication is not configured.');
   const projectId = process.env.FIREBASE_PROJECT_ID!;
   const name = 'sklcf-administrator';
@@ -18,7 +18,9 @@ export function firebaseAdminAuth() {
     credential: cert({ projectId, clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
       privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n') }),
   }, name);
-  return getAuth(app);
+  return app;
 }
+
+export function firebaseAdminAuth() { return getAuth(firebaseAdminApp()); }
 
 export { administratorEmail };

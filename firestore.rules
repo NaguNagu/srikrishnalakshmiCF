@@ -1,0 +1,13 @@
+rules_version = '2';
+// CRM model: customers/{id}, schemes/{id}, settings/company.
+// Customer PII and settings are private. The server validates every write using
+// customerSchema, schemeSchema and settingsSchema after checking the owner session.
+// The public API returns only published schemes for the upcoming month.
+// Admin SDK access is controlled by IAM; no client SDK access is needed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

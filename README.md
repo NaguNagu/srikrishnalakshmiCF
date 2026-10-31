@@ -1,10 +1,10 @@
 # Sri Krishna Lakshmi Chit Funds
 
-A responsive public website and authenticated owner CRM, built with Next.js App Router, React, TypeScript and MongoDB. Prepared for Vercel hosting. Business contact: **9942177315**.
+A responsive public website and authenticated owner CRM, built with Next.js App Router, React, TypeScript, Firebase Authentication and Cloud Firestore. Prepared for Vercel hosting. Business contact: **9942177315**.
 
 ## Run locally
 
-Requires Node.js 20.9 or newer.
+Requires Node.js 22 or newer.
 
 ```sh
 npm install
@@ -13,32 +13,32 @@ npm run dev
 
 Open `http://localhost:3000`. The owner workspace is at `/admin`.
 
-The public Savings schemes page always shows the 15 owner-supplied standard plans. Their base monthly contributions are calculated as value ÷ duration and labelled accordingly. Only administrator-published records starting in the next calendar month appear in Upcoming savings schemes. Without a database connection, that section shows a clear empty state. Without the required environment variables, owner sign-in is disabled. A separate demo workspace uses **sample records in sessionStorage in the current browser tab**. Never enter real customer information in demo mode. Demo edits do not affect the public website or a database.
+The public Savings schemes page always shows the 15 owner-supplied standard plans. Their base monthly contributions are calculated as value ÷ duration and labelled accordingly. Only administrator-published records starting in the next calendar month appear in Upcoming savings schemes. A database outage shows an availability message rather than silently hiding published schemes. Without the required environment variables, owner sign-in is disabled. The owner workspace requires Firebase administrator sign-in; there is no demo entry point.
 
 ## Firebase administrator authentication
 
-The dedicated production project is `sklcf-crm-2026`. The server service account has only the Firebase Authentication Admin role. The scoped `jwks-rsa` → `jose` override keeps Firebase Admin compatible with Vercel runtimes that disable CommonJS loading of ES modules; `firebase-runtime.test.ts` checks that restriction explicitly. Track upstream [Firebase Admin issue 3181](https://github.com/firebase/firebase-admin-node/issues/3181) before removing the override.
+The dedicated production project is `sklcf-crm-2026`. The server service account has the Firebase Authentication Admin and Cloud Datastore User roles in this dedicated project. The scoped `jwks-rsa` → `jose` override keeps Firebase Admin compatible with Vercel runtimes that disable CommonJS loading of ES modules; `firebase-runtime.test.ts` checks that restriction explicitly. Track upstream [Firebase Admin issue 3181](https://github.com/firebase/firebase-admin-node/issues/3181) before removing the override.
 
-Administrator sign-in uses Firebase Authentication with email/password. The sole authorised email is **sklcf66@gmail.com**. The initial password is never stored in source, environment examples, tests or Git history. Customer and scheme storage remains in MongoDB; this change does not migrate business data.
+Administrator sign-in uses Firebase Authentication with email/password. The sole authorised email is **sklcf66@gmail.com**. The initial password is never stored in source, environment examples, tests or Git history. Customer records, payment history, schemes and business settings persist in Cloud Firestore.
 
 1. Select the intended Firebase project before configuring cloud resources. Use a dedicated project or explicitly confirm an existing one; do not change an unrelated project's providers.
-2. Enable **Email/Password** under Firebase Authentication. For a new dedicated project, `firebase.json` contains the provider configuration; deploy it with `npx -y firebase-tools@latest deploy --only auth --project <PROJECT_ID>`. Do not deploy other Firebase services for this task.
+2. Enable **Email/Password** under Firebase Authentication. For a new dedicated project, `firebase.json` contains the provider configuration; deploy it with `npx -y firebase-tools@latest deploy --only auth --project <PROJECT_ID>`. Firestore is deployed separately as described below.
 3. Register a Firebase **Web app**. Its public configuration can be retrieved using `npx -y firebase-tools@latest apps:sdkconfig WEB <APP_ID> --project <PROJECT_ID>`. Populate the four `NEXT_PUBLIC_FIREBASE_*` variables from `.env.example`.
 4. Configure server-only Firebase Admin SDK credentials in `.env.local` and Vercel: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY`. These credentials must belong to the same project as the Web app. Never prefix them with `NEXT_PUBLIC_`, commit a service-account JSON file, or paste private keys into chat.
 5. Provision the requested administrator with `node scripts/provision-firebase-admin.mjs`. The script reads the initial password from a hidden terminal prompt. It creates only the named administrator, and leaves an existing account's password unchanged. Copy its resulting UID into server-only `FIREBASE_ADMIN_UID`. There is no public account-creation flow.
 6. In Firebase Authentication settings, add `sklcf.vercel.app` and any actual preview/local domains you use to authorised domains. Configure the reset-email template and set the Firebase project password policy to a minimum of 12 characters. Do not change the supplied email account's Google password; the administrator password belongs to the Firebase account only.
-7. Populate `MONGODB_URI` and `MONGODB_DB` for business records. Firebase sign-in and password management do not require MongoDB, but customer/scheme records and business settings do.
+7. Provision Standard Firestore `(default)` in `asia-south1` (Mumbai), then deploy `npx -y firebase-tools@latest deploy --only firestore --project sklcf-crm-2026`. The existing server credential needs `roles/datastore.user`. No separate database secret is required.
 8. Redeploy Vercel after adding the public configuration: Next.js embeds these values at build time. Private Firebase keys remain server-side.
 
 The server exchanges a recently signed-in Firebase ID token for an eight-hour Firebase session cookie. It verifies both the exact pinned UID and administrator email, not just an email match. The cookie is HttpOnly, SameSite=Strict and Secure in production. Every private customer API verifies the Firebase session with revocation checks. Unknown accounts, missing UID configuration, invalid tokens, stale sign-ins and old custom-JWT cookies are rejected. Mutations also check the request origin.
 
 **Forgot password:** the sign-in screen requests a Firebase reset email. The user completes the reset on Firebase's hosted page. The screen uses a neutral confirmation and never claims the password was changed merely because an email was requested. Only the administrator address is eligible through this UI.
 
-**Change password:** Settings includes a separate form for the current password, new password and confirmation. Firebase verifies the current password again, then the server checks the current session, administrator identity and recent sign-in before updating the Firebase password. Successful changes clear the session and require a new sign-in. Previous Firebase sessions are revoked. Demo mode cannot change credentials or send reset emails.
+**Change password:** Settings includes a separate form for the current password, new password and confirmation. Firebase verifies the current password again, then the server checks the current session, administrator identity and recent sign-in before updating the Firebase password. Successful changes clear the session and require a new sign-in. Previous Firebase sessions are revoked.
 
 The old `ADMIN_PASSWORD_HASH`, `ADMIN_EMAIL` and `SESSION_SECRET` authentication variables and password-hashing helper are no longer used. Remove obsolete variables from Vercel after the Firebase configuration is working. Existing legacy cookies stop granting access.
 
-Database indexes are created on first use, including unique record IDs. The database user needs index creation permission. Customer records never appear in the public schemes endpoint. Database outages produce an error rather than falling back to demo records; the administrator can still reach password settings after sign-in.
+Database document IDs are validated single path segments. The upcoming-schemes composite index is managed in `firestore.indexes.json` and deployed by the Firebase CLI. Customer records never appear in the public schemes endpoint. Database outages produce an error rather than falling back to demo records; the administrator can still reach password settings after sign-in.
 
 ## Deploy on Vercel
 
@@ -84,7 +84,7 @@ npm test
 npm run build
 ```
 
-Domain tests cover monthly recurrence, month-end and leap-year behavior, payment status, birthdays, India date boundaries, phone encoding and validation. The Firebase Auth emulator also verifies real SDK sign-in, session issuance/revocation, password changes and recovery without contacting a cloud project. Run it with `npx -y firebase-tools@latest emulators:exec --only auth --project demo-sklcf-auth "node --import tsx tests/firebase-emulator.mjs"`. The emulator test refuses remote hosts. Real Firebase project configuration, administrator provisioning, reset-email delivery, MongoDB storage and native WhatsApp sharing must also be verified with the intended project before launch.
+Domain tests cover monthly recurrence, month-end and leap-year behavior, payment status, birthdays, India date boundaries, phone encoding and validation. The Firebase Auth emulator also verifies real SDK sign-in, session issuance/revocation, password changes and recovery without contacting a cloud project. Run it with `npx -y firebase-tools@latest emulators:exec --only auth --project demo-sklcf-auth "node --import tsx tests/firebase-emulator.mjs"`. The emulator test refuses remote hosts. Real Firebase project configuration, administrator provisioning, reset-email delivery, Firestore storage and native WhatsApp sharing must also be verified with the intended project before launch.
 
 ## Content and asset notes
 
@@ -95,3 +95,11 @@ The Lovable reference informed plan explanations and the enquiry journey. Unveri
 `public/family-tomorrow.png` replaces the decorative text-only Our Story visual and is reused on Home and Our Story. Created with one built-in image generation call. Prompt: “A warm candid Indian family, two parents and a young daughter, planning their future together and adding rupee notes and coins to a savings jar at a light oak table in a contemporary Indian home. Natural interaction, bright daylight, powder blue and pearl interior, realistic editorial lifestyle photography, no logos or text.”
 
 `public/treasure.png` was created using the built-in image generation tool in a single generation and reused for the intro and homepage. Final prompt: “Use case: product-mockup. Asset type: a single website hero image, 3D still life. Primary request: a beautiful ornate Indian treasure chest made of dark teak with engraved brass trim, open lid, overflowing with Indian rupee banknotes, stacks of gold coins and delicate traditional Indian gold jewellery. Refined realistic cinematic product photography, hopeful morning daylight, soft powder blue seamless studio background and ground, gentle shadows. Entire chest centered with clear space around it, front three-quarter view. No people, no words, no logo, no text overlays, no watermark. Beautiful believable luxurious materials, tasteful rather than cartoonish. Landscape composition.”
+
+## Production CRM storage
+
+Firestore Standard `(default)` is in Mumbai (`asia-south1`), with database deletion protection enabled. No billing account or paid-plan upgrade was added. `customers/{id}` contains private customer records including payment history; `schemes/{id}` contains scheme records; `settings/company` contains business settings. All access goes through the server. Browser security rules deny every direct read and write, including authenticated clients. The Admin SDK uses IAM and all private API requests require the pinned administrator session. Every create/update validates the same Zod schema; customer saves validate the referenced scheme in a transaction. The public endpoint returns only validated, published schemes starting next calendar month.
+
+No MongoDB production records existed to migrate: no connection had been configured and saves were unavailable. Sample fixtures are used only in tests and are never imported into production. Do not enable browser database writes as a workaround. Security audit of deny-all client rules: no client create/update/read path; authentication and validation are enforced in the API, and the service credential is server-only.
+
+To rerun real storage verification explicitly, use `node --import tsx tests/firestore-integration.mjs --verify-sklcf-production`. It creates uniquely named disposable records, checks create/update/reload, payment history, upcoming publication, settings persistence and denied anonymous access, then removes only its own records. It does not create a real customer or send a message.

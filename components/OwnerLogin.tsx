@@ -7,8 +7,8 @@ import Brand from './Brand';
 import { administratorEmail } from '@/lib/auth-policy';
 import { firebaseClientAuth, firebaseErrorMessage } from '@/lib/firebase-client';
 
-type Props = { configured: boolean; busy: boolean; error: string; message: string; onLogin: (event: FormEvent<HTMLFormElement>) => void; onDemo: () => void };
-export default function OwnerLogin({ configured, busy, error, message, onLogin, onDemo }: Props) {
+type Props = { configured: boolean; busy: boolean; error: string; message: string; onLogin: (event: FormEvent<HTMLFormElement>) => void };
+export default function OwnerLogin({ configured, busy, error, message, onLogin }: Props) {
   const [forgot, setForgot] = useState(false), [resetBusy, setResetBusy] = useState(false), [resetMessage, setResetMessage] = useState(''), [resetError, setResetError] = useState('');
   async function resetPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setResetBusy(true); setResetError(''); setResetMessage('');
@@ -34,7 +34,6 @@ export default function OwnerLogin({ configured, busy, error, message, onLogin, 
       <><form onSubmit={onLogin}><label>Email address<input name="email" type="email" required autoComplete="username" defaultValue={administratorEmail} /></label><label>Password<input name="password" type="password" required maxLength={128} autoComplete="current-password" placeholder="Your password" /></label><button className="button primary" disabled={busy || !configured}>{busy ? 'Signing in…' : 'Sign in to workspace'} <ArrowUpRight /></button></form>
         <button className="text-link auth-text-button" onClick={() => { setForgot(true); setResetMessage(''); setResetError(''); }}>Forgot password?</button></>}
     {!configured && <p className="notice">Firebase Authentication must be connected before administrator sign-in and password reset can be used.</p>}
-    {!forgot && <><button className="button secondary" onClick={onDemo}>Explore the demo workspace <ArrowUpRight size={18} /></button><small>Demo uses sample data in this browser tab. Do not enter real customer information.</small></>}
     <Link className="text-link" href="/">Back to website</Link>
   </div></div>;
 }
