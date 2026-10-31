@@ -1,11 +1,12 @@
 import type { Firestore } from 'firebase-admin/firestore';
 import { z } from 'zod';
-import { customerSchema, schemeSchema, planSchema, featureSchema, settingsSchema, defaults, type Data } from './domain';
+import { customerSchema, schemeSchema, planSchema, featureSchema, featureVisibilitySchema, settingsSchema, defaults, type Data } from './domain';
 import { mergePlans, resolveFeatured } from './catalogue';
 export const recordWriteSchema = z.discriminatedUnion('type', [
   z.object({ type:z.literal('customer'), value:customerSchema }),
   z.object({ type:z.literal('plan'), value:planSchema }),
   z.object({ type:z.literal('feature'), value:featureSchema }),
+  z.object({ type:z.literal('featureVisibility'), value:featureVisibilitySchema }),
   z.object({ type:z.literal('settings'), value:settingsSchema }),
 ]);
 export class MissingSchemeError extends Error {}
@@ -25,6 +26,16 @@ export async function writeRecord(database:Firestore,input:unknown) {
  if(record.type==='settings') {await database.collection('settings').doc('company').set(record.value);return;}
  if(record.type==='plan') {await database.collection('plans').doc(record.value.id).set(record.value);return;}
  const plans=await readPlans(database);
+ if(record.type==='featureVisibility') {
+  await database.runTransaction(async transaction=>{
+   const ref=database.collection('schemes').doc(record.value.id);
+   const existing=await transaction.get(ref);
+   if(!existing.exists)throw new MissingSchemeError('This featured start no longer exists.');
+   const scheme=schemeSchema.parse(existing.data());
+   if(record.value.published&&scheme.planId&&!plans.some(p=>p.id===scheme.planId&&p.enabled))throw new MissingSchemeError('Turn on the underlying plan before featuring this start.');
+   transaction.update(ref,{published:record.value.published});
+  });return;
+ }
  if(record.type==='feature') {
   const plan=plans.find(p=>p.id===record.value.planId);
   if(!plan)throw new MissingSchemeError('Choose an existing plan.');

@@ -109,3 +109,7 @@ To rerun real storage verification explicitly, use `node --import tsx tests/fire
 `/api/plans` returns enabled plans only. `/api/schemes` returns Featured starts without a date window. Both endpoints validate their public fields and return no customer information. `/api/data` includes all plans for the pinned administrator, including disabled plans. Customer selection uses plan IDs; duration defaults to the selected plan. Existing customer records retain their saved duration and schedule. Plan toggles do not delete enrolments.
 
 The running month derives from the first due date and today in India: before the first due it is Not started, the first due is month 1, and each recurring due date increments it. Dates such as the 31st use month-end in shorter months, including leap years. It is capped at the agreed duration. The open admin page refreshes its date every minute and on focus, so no scheduled database write is needed.
+
+Featured starts have their own Turn off/Turn on button. The server updates only the featured entry’s publication flag, retaining its dates, slots, plan and customer records. Turning off unlists it from the public Featured section and customer promotion selector.
+
+Scheme posters use the approved navy logo treatment, a prominent chit-value panel, contribution/duration details, start date and slot count, benefits and a contact panel. PNGs are 1080px wide with a minimum height of 1350px; height expands for long benefits/addresses to prevent overlap. Posters require the registered logo asset to load successfully.

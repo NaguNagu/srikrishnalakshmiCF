@@ -32,6 +32,12 @@ try {
   const publicSchemes = await readUpcomingSchemes(database);
   assert.equal(publicSchemes.schemes.find(s => s.id === schemeId)?.slots, 2);
   assert.ok(!JSON.stringify(publicSchemes).includes(customer.phone));
+  await writeRecord(database,{type:'featureVisibility',value:{id:schemeId,published:false}});
+  assert.equal((await readUpcomingSchemes(database)).schemes.some(s=>s.id===schemeId),false);
+  assert.equal((await readRecords(database)).plans.find(p=>p.id===planId)?.enabled,true);
+  assert.equal((await database.collection('schemes').doc(schemeId).get()).data()?.slots,2);
+  await writeRecord(database,{type:'featureVisibility',value:{id:schemeId,published:true}});
+  assert.equal((await readUpcomingSchemes(database)).schemes.some(s=>s.id===schemeId),true);
   await writeRecord(database,{type:'plan',value:{...plan,monthly:4321}});
   assert.equal((await readUpcomingSchemes(database)).schemes.find(s=>s.id===schemeId)?.monthly,4321);
   await writeRecord(database,{type:'plan',value:{...plan,enabled:false}});
